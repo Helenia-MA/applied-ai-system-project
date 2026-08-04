@@ -1,2 +1,8 @@
 streamlit>=1.30
 pytest>=7.0
+
+# AI care-suggestion feature (RAG). The app still runs without a key — see
+# USE_LLM in the README — but these are needed for suggestions to work.
+google-genai>=1.0
+pydantic>=2.0
+python-dotenv>=1.0
