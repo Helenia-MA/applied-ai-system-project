@@ -21,6 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from advisor import DEFAULT_MODEL, llm_enabled, suggest_care_tasks, unavailable_reason
+from logging_setup import setup_logging
 from pawpal_system import PRIORITY_LABELS, Owner
 
 
@@ -40,8 +41,9 @@ def build_test_pet():
 
 
 def main() -> int:
-    # INFO shows the retrieval line and token usage, which is most of the point.
-    logging.basicConfig(level=logging.INFO, format="  %(levelname)-7s %(name)s: %(message)s")
+    # INFO shows the retrieval line and token usage, which is most of the point
+    # of running this. Third-party HTTP chatter is quieted by setup_logging.
+    log_path = setup_logging("INFO")
 
     if not llm_enabled():
         print(f"\nCannot run: {unavailable_reason()}")
@@ -98,6 +100,8 @@ def main() -> int:
         return 1
 
     print("\nOK — retrieval fed generation, and every citation checks out.")
+    if log_path:
+        print(f"Log written to {log_path}")
     return 0
 
 

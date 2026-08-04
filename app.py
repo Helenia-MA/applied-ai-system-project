@@ -2,6 +2,7 @@ from datetime import date, time
 
 import streamlit as st
 from advisor import llm_enabled, suggest_care_tasks, unavailable_reason
+from logging_setup import setup_logging
 from pawpal_system import (
     SOURCE_OWNER,
     Task,
@@ -12,6 +13,12 @@ from pawpal_system import (
     PRIORITY_LABELS,
 )
 from retrieval import KnowledgeBaseError, avoid_keywords, retrieve
+
+# Streamlit re-runs this whole file on every interaction; setup_logging() is
+# idempotent, so this configures handlers once rather than stacking a new pair
+# on each click.
+LOG_PATH = setup_logging()
+
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
 st.title("🐾 PawPal+")
@@ -270,6 +277,9 @@ else:
         "⚠️ Suggestions come from a small illustrative care knowledge base and are "
         "not veterinary advice. Check anything medical with your vet."
     )
+    if LOG_PATH:
+        # Every lookup, token count, and guardrail rejection is recorded here.
+        st.caption(f"Activity is logged to `{LOG_PATH}`.")
 
 st.divider()
 

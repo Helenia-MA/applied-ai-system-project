@@ -6,9 +6,11 @@ Builds a small owner/pets/tasks scenario and prints today's schedule for each
 pet to the terminal, along with the scheduler's reasoning.
 """
 
+import os
 from datetime import date
 
 from advisor import llm_enabled, suggest_care_tasks, unavailable_reason
+from logging_setup import setup_logging
 from pawpal_system import Owner, Scheduler, PRIORITY_VALUES, PRIORITY_LABELS
 from retrieval import KnowledgeBaseError, avoid_keywords, retrieve
 
@@ -239,8 +241,16 @@ def demo_ai_suggestions() -> None:
 
 
 if __name__ == "__main__":
+    # WARNING by default so the demo output stays readable. Set
+    # PAWPAL_LOG_LEVEL=INFO to see the retrieval and token-usage lines, which are
+    # the audit trail for the AI feature. Either way they go to logs/pawpal.log.
+    log_path = setup_logging(os.environ.get("PAWPAL_LOG_LEVEL", "WARNING"))
+
     owner = build_sample_owner()
     print_schedule(owner)
     demo_sorting_and_filtering(owner)
     demo_recurring_spawn(owner)
     demo_ai_suggestions()
+
+    if log_path:
+        print(f"\nFull activity log: {log_path}")
