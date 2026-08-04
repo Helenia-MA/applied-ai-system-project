@@ -1,8 +1,15 @@
 """PawPal+ — class skeleton generated from diagrams/uml.mmd.
 """
 
+import re
 from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover - import only for type checkers
+    # Type-only, so this module stays runtime-independent of the AI feature: the
+    # scheduler works with no knowledge base, no API key, and no SDK installed.
+    from advisor import CareSuggestion
 
 
 # Priority is stored as a NUMBER internally (higher = more important) so tasks
@@ -12,6 +19,24 @@ PRIORITY_VALUES = {label: value for value, label in PRIORITY_LABELS.items()}
 
 # How many days must pass before a recurring task is due again.
 FREQUENCY_DAYS = {"daily": 1, "weekly": 7}
+
+# Where a task came from. Tracked so the owner can always tell which parts of a
+# plan they wrote and which came from an AI suggestion they accepted — the plan
+# shows both together, so provenance has to travel with the task.
+SOURCE_OWNER = "owner"
+SOURCE_SUGGESTED = "suggested"
+
+
+def _provenance(task: "Task") -> str:
+    """Reasoning-line suffix marking a task the owner accepted from a suggestion.
+
+    Owner-created tasks get nothing, so the common case reads unchanged. Applied
+    in `Scheduler.explain` so the plan's own reasoning shows which entries came
+    from retrieved care guidance and which chunk each one came from.
+    """
+    if task.source != SOURCE_SUGGESTED:
+        return ""
+    return f" (suggested from {task.source_note})" if task.source_note else " (suggested)"
 
 
 @dataclass
@@ -31,6 +56,8 @@ class Task:
     completed: bool = False
     time: str = "12:00"             # 24-hour "HH:MM" clock time this task happens
     due_date: date | None = None    # the day this occurrence is due (None = any day)
+    source: str = SOURCE_OWNER      # SOURCE_OWNER, or SOURCE_SUGGESTED if AI-proposed
+    source_note: str = ""           # for suggested tasks: the guidance behind it
 
     def mark_complete(self) -> None:
         """Mark this occurrence as done."""
@@ -88,15 +115,40 @@ class Pet:
         frequency: str = "daily",
         time: str = "12:00",
         due_date: date | None = None,
+        source: str = SOURCE_OWNER,
+        source_note: str = "",
     ) -> Task:
         """Create a Task with the next id, append it, and return it."""
         task = Task(
             self._next_id, name, duration_minutes, priority, frequency,
-            time=time, due_date=due_date,
+            time=time, due_date=due_date, source=source, source_note=source_note,
         )
         self._next_id += 1
         self.tasks.append(task)
         return task
+
+    def accept_suggestion(self, suggestion: "CareSuggestion") -> Task:
+        """Turn an accepted AI suggestion into a real task on this pet.
+
+        This is the point where the RAG feature stops being advisory and starts
+        changing the schedule: from here the task is an ordinary Task, so it goes
+        through `Scheduler.build_plan` and the conflict checks like any other —
+        competing for the same time budget and able to displace lower-priority
+        work. Nothing about the scheduler needed to change to allow that.
+
+        Only reachable through an explicit owner action. The task is tagged
+        SOURCE_SUGGESTED and keeps the chunk id it came from, so a suggestion can
+        always be traced back to the guidance that produced it.
+        """
+        return self.add_task(
+            suggestion.name,
+            suggestion.duration_minutes,
+            suggestion.priority,
+            frequency=suggestion.frequency,
+            time=suggestion.time,
+            source=SOURCE_SUGGESTED,
+            source_note=suggestion.source_chunk_id,
+        )
 
     def edit_task(
         self,
@@ -265,6 +317,10 @@ class Scheduler:
             frequency=task.frequency,
             time=task.time,
             due_date=today + timedelta(days=interval),
+            # Provenance survives recurrence: tomorrow's occurrence of an
+            # accepted suggestion is still a suggested task.
+            source=task.source,
+            source_note=task.source_note,
         )
 
     def detect_time_conflicts(self, owner: "Owner", today: date) -> list[str]:
@@ -326,6 +382,45 @@ class Scheduler:
 
         return conflicts
 
+    def detect_restricted_tasks(
+        self,
+        pet: "Pet",
+        avoid: list[str],
+        today: date,
+    ) -> list[str]:
+        """Flag due tasks that clash with what this pet should avoid.
+
+        `avoid` is the list of activity keywords drawn from the care guidance
+        retrieved for this pet (see `retrieval.avoid_keywords`). This is the
+        second way the knowledge base changes system behaviour: rather than only
+        adding tasks, retrieved guidance also changes how the scheduler *judges*
+        the tasks already there. A dog whose profile says "avoid stairs" gets its
+        existing stair-climbing task flagged, whether an owner or an AI added it.
+
+        Keywords are matched on whole-word boundaries so "stairs" doesn't fire on
+        "upstairs". Warns rather than removing anything — the owner decides, and
+        a keyword match is a prompt to think, not a verdict.
+
+        Takes `avoid` as an argument rather than fetching it, which keeps this
+        module free of any runtime dependency on the knowledge base or the AI
+        feature. Returns human-readable warnings; empty means nothing clashed.
+        """
+        warnings: list[str] = []
+        for task in pet.tasks:
+            if not task.needs_doing(today):
+                continue
+            for keyword in avoid:
+                # Same whole-phrase rule retrieval uses for its tags. Duplicated
+                # in three lines rather than imported, to keep this module
+                # standalone.
+                if re.search(rf"\b{re.escape(keyword)}\b", task.name.lower()):
+                    warnings.append(
+                        f"'{task.name}' involves {keyword}, which {pet.name}'s "
+                        f"care profile says to avoid."
+                    )
+                    break  # one warning per task is enough
+        return warnings
+
     def explain(
         self,
         planned: list[Task],
@@ -351,7 +446,9 @@ class Scheduler:
             lines.append("Included:")
             for t in planned:
                 label = PRIORITY_LABELS.get(t.priority, str(t.priority))
-                lines.append(f"  • {t.name} — {t.duration_minutes} min [{label}]")
+                lines.append(
+                    f"  • {t.name} — {t.duration_minutes} min [{label}]{_provenance(t)}"
+                )
 
         if skipped:
             lines.append("")
@@ -360,7 +457,8 @@ class Scheduler:
                 label = PRIORITY_LABELS.get(t.priority, str(t.priority))
                 reason = "already completed" if t.completed else "didn't fit remaining time"
                 lines.append(
-                    f"  • {t.name} — {t.duration_minutes} min [{label}] ({reason})"
+                    f"  • {t.name} — {t.duration_minutes} min [{label}]"
+                    f"{_provenance(t)} ({reason})"
                 )
 
         return "\n".join(lines)
