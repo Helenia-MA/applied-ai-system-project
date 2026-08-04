@@ -20,17 +20,21 @@ classDiagram
         +str name
         +str species
         +int available_minutes
+        +str breed
+        +int age
+        +str medical_condition
         +list~Task~ tasks
         -int _next_id
         +add_task(name, duration_minutes, priority, frequency, time, due_date) Task
         +edit_task(id, name, duration_minutes, priority, frequency, completed, time) Task
         +set_availability(minutes) void
+        +describe() str
     }
 
     class Owner {
         +str name
         +list~Pet~ pets
-        +add_pet(name, species, available_minutes) Pet
+        +add_pet(name, species, available_minutes, breed, age, medical_condition) Pet
         +get_all_tasks() list~Task~
         +tasks_for_pet(name) list~Task~
     }
@@ -80,6 +84,10 @@ classDiagram
     %%   - available_minutes lives on each Pet: the owner allocates time per pet
     %%     (e.g. 60 min dog, 30 min cat). Each pet is scheduled against its own
     %%     budget. Simplification: no owner-wide total cap across all pets.
+    %%   - Pet profile fields (breed, age, medical_condition) are descriptive
+    %%     only: the Scheduler never reads them, so adding them can't change any
+    %%     plan. age and medical_condition are optional (None = unknown / none
+    %%     known) so a blank form field stays distinct from a real value.
     %%   - Each Task has a unique id (name isn't unique). Owner keeps a
     %%     _next_id counter so ids are deterministic (1, 2, 3...) — good
     %%     for tests. edit_task finds a task by id. No parallel name->id

@@ -76,13 +76,38 @@ with st.form("add_pet", clear_on_submit=True):
         new_species = st.text_input("Species", value="", placeholder="e.g. dog, rabbit, parrot")
     with col3:
         pet_minutes = st.number_input("Time available (min)", min_value=0, max_value=600, value=60)
+
+    col4, col5 = st.columns(2)
+    with col4:
+        new_breed = st.text_input("Breed", value="", placeholder="e.g. tabby, labrador")
+    with col5:
+        # 0 doubles as "not given" — a pet under a year old reads as 0 anyway,
+        # and we store None so describe() can leave the age out entirely.
+        new_age = st.number_input(
+            "Age (years, 0 if unknown)", min_value=0, max_value=40, value=0
+        )
+
+    new_condition = st.text_input(
+        "Medical condition (optional)",
+        value="",
+        placeholder="e.g. arthritis, diabetes — leave blank if none",
+    )
     add_pet = st.form_submit_button("Add pet")
 
 if add_pet:
     if not new_pet_name.strip():
         st.warning("Give your pet a name first.")
     else:
-        owner.add_pet(new_pet_name.strip(), new_species.strip(), int(pet_minutes))
+        owner.add_pet(
+            new_pet_name.strip(),
+            new_species.strip(),
+            int(pet_minutes),
+            breed=new_breed.strip(),
+            # Blank inputs become None rather than 0/"" so "unknown" and "none
+            # known" stay distinguishable from a real value.
+            age=int(new_age) or None,
+            medical_condition=new_condition.strip() or None,
+        )
         st.success(f"Added {new_pet_name.strip()} to {owner.name or 'you'}.")
 
 st.divider()
@@ -147,9 +172,14 @@ else:
         )
 
     for pet in owner.pets:
+        profile = pet.describe()
         st.markdown(
-            f"**{pet.name}** ({pet.species}) — {pet.available_minutes} min available"
+            f"**{pet.name}**"
+            + (f" ({profile})" if profile else "")
+            + f" — {pet.available_minutes} min available"
         )
+        if pet.medical_condition:
+            st.caption(f"🩺 {pet.medical_condition}")
 
         # Hide occurrences that aren't due yet (the future recurrences spawned
         # when a recurring task is completed); they reappear on their due date.
@@ -277,7 +307,16 @@ if st.button("Generate schedule"):
 
         plans = scheduler.all_owner_plans(owner, today)
         for pet, plan in plans.items():
-            st.markdown(f"### {pet.name} ({pet.species}) — {pet.available_minutes} min")
+            profile = pet.describe()
+            st.markdown(
+                f"### {pet.name}"
+                + (f" ({profile})" if profile else "")
+                + f" — {pet.available_minutes} min"
+            )
+            # Surfaced with the plan so the owner has the condition in mind while
+            # working through the day's care (it doesn't change the ordering).
+            if pet.medical_condition:
+                st.info(f"🩺 Medical condition: {pet.medical_condition}")
 
             # Per-pet conflicts (over budget, duplicate task names).
             conflicts = scheduler.detect_conflicts(pet, today)

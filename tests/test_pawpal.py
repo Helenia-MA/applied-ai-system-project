@@ -315,6 +315,41 @@ def test_build_plan_empty_when_zero_minutes_available():
     assert Scheduler().build_plan(pet.tasks, pet.available_minutes, today) == []
 
 
+# --- Feature: pet profile (breed / age / medical condition) --------------
+
+def test_add_pet_stores_profile_fields():
+    """Owner.add_pet passes breed, age, and medical condition through to the Pet."""
+    owner = Owner("Jordan")
+
+    pet = owner.add_pet(
+        "Biscuit", "dog", 60,
+        breed="labrador", age=3, medical_condition="arthritis",
+    )
+
+    assert (pet.breed, pet.age, pet.medical_condition) == ("labrador", 3, "arthritis")
+
+
+def test_pet_profile_fields_are_optional():
+    """A pet added without profile details has no breed, age, or condition."""
+    pet = Pet("Mochi", "cat", available_minutes=30)
+
+    assert pet.breed == ""
+    # None (not 0 / "") so "unknown" stays distinct from a real value.
+    assert pet.age is None
+    assert pet.medical_condition is None
+
+
+def test_describe_joins_filled_fields_and_skips_blanks():
+    """describe() lists only the profile fields that were actually given."""
+    full = Pet("Biscuit", "dog", 60, breed="labrador", age=3)
+    one_year_old = Pet("Pip", "hamster", 10, age=1)
+    bare = Pet("Nameless")
+
+    assert full.describe() == "dog · labrador · 3 yrs"
+    assert one_year_old.describe() == "hamster · 1 yr"   # singular for one year
+    assert bare.describe() == ""
+
+
 # --- Feature: reasoning / explanation ------------------------------------
 
 def test_explain_reports_planned_and_skipped_counts():

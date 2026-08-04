@@ -204,7 +204,7 @@ tests/test_pawpal.py ........................                                   
 Launch the app with `streamlit run app.py`. The page is a single scrolling form with these sections:
 
 - **Owner** — type an owner name (starts blank). A **Start over** button clears everything and resets to a fresh, empty form without restarting the server.
-- **Add a pet** — enter a pet name,its species, and set how many minutes are available for that pet today. Each pet carries its own time budget.
+- **Add a pet** — enter a pet name, its species, breed, and age, and set how many minutes are available for that pet today. Each pet carries its own time budget. A **medical condition** field is optional — leave it blank if there's none; when filled in it's shown beside the pet everywhere it appears, including above its daily plan. Profile details are descriptive only: they don't change how the schedule is built.
 - **Add a task** — pick which pet the task belongs to, then set its title, duration, priority (low / medium / high), frequency (daily / weekly), and time of day.
 - **Current pets & tasks** — lists every pet with its due tasks. Here you can:
   - **Sort** the list by Time, Priority, or Duration.

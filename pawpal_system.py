@@ -54,13 +54,28 @@ class Pet:
 
     Each pet manages its own tasks and carries its own available_minutes, so the
     owner can allocate time per pet (e.g. 60 min for the dog, 30 for the cat).
+
+    Profile fields (breed, age, medical_condition) are descriptive only — they
+    don't affect scheduling. `medical_condition` is optional: None means "no
+    known condition", which is why it isn't just an empty string.
     """
 
-    def __init__(self, name: str, species: str = "", available_minutes: int = 0) -> None:
+    def __init__(
+        self,
+        name: str,
+        species: str = "",
+        available_minutes: int = 0,
+        breed: str = "",
+        age: int | None = None,
+        medical_condition: str | None = None,
+    ) -> None:
         """Create a pet with an empty task list and its own time budget."""
         self.name: str = name
         self.species: str = species
         self.available_minutes: int = available_minutes
+        self.breed: str = breed
+        self.age: int | None = age                             # in years; None = unknown
+        self.medical_condition: str | None = medical_condition  # None = none known
         self.tasks: list[Task] = []
         # Counter so each task gets a unique, deterministic id (1, 2, 3...).
         self._next_id: int = 1
@@ -115,6 +130,17 @@ class Pet:
         """Set how many minutes the owner has for this pet today."""
         self.available_minutes = minutes
 
+    def describe(self) -> str:
+        """One-line profile, e.g. "dog · labrador · 3 yrs" — blank fields drop out.
+
+        Both UI sections show a pet header, so the formatting lives here rather
+        than being duplicated. Returns "" for a pet with no profile filled in.
+        """
+        parts = [self.species, self.breed]
+        if self.age is not None:
+            parts.append(f"{self.age} yr" if self.age == 1 else f"{self.age} yrs")
+        return " · ".join(p for p in parts if p)
+
 
 class Owner:
     """Holds the owner's pets. Time is allocated per pet (see Pet.available_minutes)."""
@@ -124,9 +150,20 @@ class Owner:
         self.name: str = name
         self.pets: list[Pet] = []
 
-    def add_pet(self, name: str, species: str = "", available_minutes: int = 0) -> Pet:
+    def add_pet(
+        self,
+        name: str,
+        species: str = "",
+        available_minutes: int = 0,
+        breed: str = "",
+        age: int | None = None,
+        medical_condition: str | None = None,
+    ) -> Pet:
         """Create a Pet (with its own time budget), append it, and return it."""
-        pet = Pet(name, species, available_minutes)
+        pet = Pet(
+            name, species, available_minutes,
+            breed=breed, age=age, medical_condition=medical_condition,
+        )
         self.pets.append(pet)
         return pet
 
