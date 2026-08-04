@@ -30,7 +30,12 @@ Your final app should:
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+cp .env.example .env
 ```
+
+If you want the AI suggestion flow, put your Gemini key in `.env` as either
+`GEMINI_API_KEY` or `GOOGLE_API_KEY`. If you do not want to use the model,
+set `USE_LLM=0` and the rest of the app will still run normally.
 
 ### Suggested workflow
 
@@ -320,3 +325,31 @@ After:  Mochi has 4 task(s) (a new occurrence was spawned).
 ```
 
 **Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
+
+## Reflection
+
+- The strongest part of the design was the recurrence flow: completing a daily
+  or weekly task spawns the next occurrence without changing the scheduler.
+- The main improvement I would make next is the priority logic, so the plan can
+  consider more than just fit and duration when space is tight.
+- The most important takeaway was that small, well-scoped chunks of work made
+  the AI help more reliable and much easier to verify.
+
+## Clean-Clone Verification
+
+To verify the project from a fresh clone:
+
+1. Create and activate a virtual environment.
+2. Install dependencies with `pip install -r requirements.txt`.
+3. Copy `.env.example` to `.env`.
+4. Add a Gemini key if you want suggestions, or set `USE_LLM=0` to skip that
+   feature.
+5. Run `pytest` and confirm the test suite passes.
+6. Run `python scripts/smoke_check.py` to confirm the app starts and logging is
+   wired correctly.
+7. Launch `streamlit run app.py` and verify the notice about suggestions being
+   illustrative care guidance, not veterinary advice, appears in the UI.
+
+On a clean clone, those steps should leave you with a working schedule planner,
+an activity log in `logs/pawpal.log`, and a suggestion flow that can be turned
+off safely when no API key is available.

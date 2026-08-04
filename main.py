@@ -6,9 +6,13 @@ Builds a small owner/pets/tasks scenario and prints today's schedule for each
 pet to the terminal, along with the scheduler's reasoning.
 """
 
+import os
 from datetime import date
 
+from advisor import llm_enabled, suggest_care_tasks, unavailable_reason
+from logging_setup import setup_logging
 from pawpal_system import Owner, Scheduler, PRIORITY_VALUES, PRIORITY_LABELS
+from retrieval import KnowledgeBaseError, avoid_keywords, retrieve
 
 # Shorthand so we can read tasks as high/medium/low instead of 3/2/1.
 HIGH = PRIORITY_VALUES["high"]
@@ -148,8 +152,105 @@ def print_schedule(owner: Owner) -> None:
         print(scheduler.explain(plan, skipped, pet.available_minutes))
 
 
+def demo_ai_suggestions() -> None:
+    """Show retrieval changing a plan: retrieve → suggest → accept → replan.
+
+    Builds its own owner so the demos above stay independent of this one, and so
+    the pet can carry the breed, age, and condition that retrieval matches on.
+
+    Degrades in stages rather than all at once: with no knowledge base it says so
+    and stops; with a knowledge base but no API key it still shows retrieval and
+    the restricted-activity warnings, and skips only the generation step.
+    """
+    print("\n" + "=" * 48)
+    print("AI care suggestions — retrieval changes the plan")
+    print("=" * 48)
+
+    owner = Owner("Jordan")
+    pet = owner.add_pet(
+        "Biscuit", "dog", available_minutes=45,
+        breed="Labrador Retriever", age=9, medical_condition="hip dysplasia",
+    )
+    pet.add_task("Morning walk", 30, HIGH, time="08:00")
+    # Deliberately something the care guidance says to avoid, so the
+    # restricted-activity check below has a real clash to flag.
+    pet.add_task("Stairs practice", 15, LOW, time="17:00")
+
+    scheduler = Scheduler()
+    today = date.today()
+
+    print(f"\n{pet.name} — {pet.describe()}, {pet.medical_condition}")
+    print(f"{pet.available_minutes} min available")
+
+    print("\nPlan before suggestions:")
+    for task in scheduler.build_plan(pet.tasks, pet.available_minutes, today):
+        print(f"  {show_task(task)}")
+
+    # Retrieval: which guidance matches this pet's profile?
+    try:
+        chunks = retrieve(pet)
+    except KnowledgeBaseError as error:
+        print(f"\nKnowledge base unavailable: {error}")
+        return
+
+    print(f"\nRetrieved {len(chunks)} guidance chunk(s):")
+    for chunk in chunks:
+        print(f"  - {chunk.id}")
+
+    restricted = avoid_keywords(chunks)
+    if restricted:
+        print(f"\nActivities to avoid for this pet: {', '.join(restricted)}")
+        for warning in scheduler.detect_restricted_tasks(pet, restricted, today):
+            print(f"  ⚠ {warning}")
+
+    if not llm_enabled():
+        print(f"\n{unavailable_reason()}")
+        print("Retrieval and the warnings above still work — only the suggestion")
+        print("step needs a key. See the README for setup.")
+        return
+
+    result = suggest_care_tasks(pet, chunks=chunks)
+    if not result.available:
+        print(f"\nSuggestions unavailable: {result.reason}")
+        return
+
+    print(f"\n{len(result.suggestions)} suggestion(s), each citing its source:")
+    for suggestion in result.suggestions:
+        print(f"  {suggestion.time}  {suggestion.name:<32} "
+              f"{suggestion.duration_minutes:>3} min "
+              f"[{PRIORITY_LABELS[suggestion.priority]:<6}] "
+              f"<- {suggestion.source_chunk_id}")
+    if result.rejected:
+        print(f"\n{len(result.rejected)} filtered out by the guardrails:")
+        for reason in result.rejected:
+            print(f"  - {reason}")
+
+    # Accept the top two, the way an owner would click Accept in the UI.
+    accepted = [pet.accept_suggestion(s) for s in result.suggestions[:2]]
+    print(f"\nOwner accepted: {', '.join(task.name for task in accepted)}")
+
+    print("\nPlan after accepting:")
+    plan = scheduler.build_plan(pet.tasks, pet.available_minutes, today)
+    for task in plan:
+        print(f"  {show_task(task)}")
+
+    # The reasoning marks which entries came from accepted guidance.
+    skipped = [t for t in pet.tasks if t.needs_doing(today) and t not in plan]
+    print()
+    print(scheduler.explain(plan, skipped, pet.available_minutes))
+
+
 if __name__ == "__main__":
+    # WARNING by default so the demo output stays readable. Set
+    # PAWPAL_LOG_LEVEL=INFO to see the retrieval and token-usage lines, which are
+    # the audit trail for the AI feature. Either way they go to logs/pawpal.log.
+    log_path = setup_logging(os.environ.get("PAWPAL_LOG_LEVEL", "WARNING"))
+
     owner = build_sample_owner()
     print_schedule(owner)
     demo_sorting_and_filtering(owner)
     demo_recurring_spawn(owner)
+    demo_ai_suggestions()
+
+    if log_path:
+        print(f"\nFull activity log: {log_path}")

@@ -1,8 +1,16 @@
 """Tests for PawPal+ core behaviors."""
 
 from datetime import date, timedelta
+from types import SimpleNamespace
 
-from pawpal_system import Owner, Pet, Scheduler, Task
+from pawpal_system import (
+    SOURCE_OWNER,
+    SOURCE_SUGGESTED,
+    Owner,
+    Pet,
+    Scheduler,
+    Task,
+)
 
 
 def test_mark_complete_changes_status():
@@ -365,3 +373,181 @@ def test_explain_reports_planned_and_skipped_counts():
     assert "30 of 30 min used" in text
     assert "Walk" in text and "Brush" in text
     assert "didn't fit remaining time" in text
+
+
+# --- Feature: task provenance (owner vs accepted AI suggestion) ----------
+
+def test_tasks_are_owner_sourced_by_default():
+    """Provenance defaults to the owner, so existing behaviour is unchanged."""
+    pet = Pet("Biscuit", "dog", available_minutes=60)
+
+    task = pet.add_task("Morning walk", 30, 3)
+
+    assert task.source == SOURCE_OWNER
+    assert task.source_note == ""
+
+
+def test_accept_suggestion_creates_a_real_task():
+    """An accepted suggestion becomes an ordinary Task tagged with its origin."""
+    pet = Pet("Biscuit", "dog", available_minutes=60)
+    suggestion = SimpleNamespace(
+        name="Swim session", duration_minutes=20, priority=3,
+        time="09:00", frequency="daily", source_chunk_id="dog-hip-dysplasia",
+    )
+
+    task = pet.accept_suggestion(suggestion)
+
+    assert task in pet.tasks
+    assert task.name == "Swim session"
+    assert task.duration_minutes == 20
+    assert task.time == "09:00"
+    # Tagged so the owner can always tell which tasks came from a suggestion,
+    # and which piece of guidance produced this one.
+    assert task.source == SOURCE_SUGGESTED
+    assert task.source_note == "dog-hip-dysplasia"
+
+
+def test_accepted_suggestions_get_their_own_ids():
+    """Suggested tasks share the pet's id counter, so ids stay unique."""
+    pet = Pet("Biscuit", "dog", available_minutes=60)
+    owner_task = pet.add_task("Morning walk", 30, 3)
+    suggestion = SimpleNamespace(
+        name="Swim session", duration_minutes=20, priority=3,
+        time="09:00", frequency="daily", source_chunk_id="dog-hip-dysplasia",
+    )
+
+    suggested = pet.accept_suggestion(suggestion)
+
+    assert suggested.id != owner_task.id
+
+
+def test_provenance_survives_recurrence():
+    """Tomorrow's occurrence of an accepted suggestion is still a suggestion."""
+    pet = Pet("Biscuit", "dog", available_minutes=60)
+    suggestion = SimpleNamespace(
+        name="Swim session", duration_minutes=20, priority=3,
+        time="09:00", frequency="daily", source_chunk_id="dog-hip-dysplasia",
+    )
+    accepted = pet.accept_suggestion(suggestion)
+
+    spawned = Scheduler().complete_task(pet, accepted.id, date(2026, 7, 7))
+
+    assert spawned.source == SOURCE_SUGGESTED
+    assert spawned.source_note == "dog-hip-dysplasia"
+
+
+# --- Feature: accepted suggestions change the plan -----------------------
+
+def test_an_accepted_suggestion_competes_for_the_time_budget():
+    """The integration that matters: a suggestion changes what the plan contains.
+
+    The accepted task is high priority and fits, so it displaces a low-priority
+    task that previously fit. Nothing in build_plan knows about suggestions —
+    they're ordinary tasks by the time it sees them.
+    """
+    pet = Pet("Biscuit", "dog", available_minutes=30)
+    pet.add_task("Brushing", 25, 1, time="19:00")     # low priority, fits alone
+    scheduler = Scheduler()
+    today = date(2026, 7, 7)
+
+    before = [t.name for t in scheduler.build_plan(pet.tasks, 30, today)]
+    assert before == ["Brushing"]
+
+    pet.accept_suggestion(SimpleNamespace(
+        name="Medication", duration_minutes=10, priority=3,
+        time="07:30", frequency="daily", source_chunk_id="dog-arthritis",
+    ))
+    after = [t.name for t in scheduler.build_plan(pet.tasks, 30, today)]
+
+    # Medication is high priority so it's taken first; Brushing no longer fits
+    # in the 20 minutes left.
+    assert after == ["Medication"]
+
+
+def test_explain_marks_suggested_tasks_with_their_source():
+    """The plan's reasoning shows which entries came from retrieved guidance."""
+    pet = Pet("Biscuit", "dog", available_minutes=60)
+    owner_task = pet.add_task("Morning walk", 30, 3, time="08:00")
+    suggested = pet.accept_suggestion(SimpleNamespace(
+        name="Swim session", duration_minutes=20, priority=3,
+        time="09:00", frequency="daily", source_chunk_id="dog-hip-dysplasia",
+    ))
+
+    text = Scheduler().explain([owner_task, suggested], [], 60)
+
+    assert "Swim session — 20 min [high] (suggested from dog-hip-dysplasia)" in text
+    # An owner's own task is unmarked, so the common case reads as before.
+    assert "Morning walk — 30 min [high]\n" in text or text.endswith(
+        "Morning walk — 30 min [high]")
+
+
+# --- Feature: retrieved guidance flags restricted tasks ------------------
+
+def test_detect_restricted_tasks_flags_a_clashing_task():
+    """Retrieved 'avoid' keywords change how the scheduler judges existing tasks."""
+    pet = Pet("Biscuit", "dog", available_minutes=60,
+              medical_condition="hip dysplasia")
+    pet.add_task("Stairs practice", 15, 2, time="10:00")
+    pet.add_task("Gentle swim", 20, 3, time="11:00")
+
+    warnings = Scheduler().detect_restricted_tasks(
+        pet, ["stairs", "jumping"], date(2026, 7, 7))
+
+    assert len(warnings) == 1
+    assert "Stairs practice" in warnings[0]
+    assert "stairs" in warnings[0]
+
+
+def test_detect_restricted_tasks_matches_whole_words_only():
+    """'stairs' must not fire on 'upstairs' — the same rule retrieval tags use."""
+    pet = Pet("Biscuit", "dog", available_minutes=60)
+    pet.add_task("Upstairs bedroom tidy", 10, 1, time="10:00")
+
+    warnings = Scheduler().detect_restricted_tasks(
+        pet, ["stairs"], date(2026, 7, 7))
+
+    assert warnings == []
+
+
+def test_detect_restricted_tasks_warns_once_per_task():
+    """A task matching two keywords is still one warning, not two."""
+    pet = Pet("Biscuit", "dog", available_minutes=60)
+    pet.add_task("Stairs and jumping drills", 15, 2, time="10:00")
+
+    warnings = Scheduler().detect_restricted_tasks(
+        pet, ["stairs", "jumping"], date(2026, 7, 7))
+
+    assert len(warnings) == 1
+
+
+def test_detect_restricted_tasks_ignores_completed_tasks():
+    """Only tasks still due are worth warning about."""
+    pet = Pet("Biscuit", "dog", available_minutes=60)
+    task = pet.add_task("Stairs practice", 15, 2, time="10:00")
+    task.mark_complete()
+
+    assert Scheduler().detect_restricted_tasks(
+        pet, ["stairs"], date(2026, 7, 7)) == []
+
+
+def test_detect_restricted_tasks_is_empty_with_no_restrictions():
+    """A pet with no retrieved restrictions gets no warnings."""
+    pet = Pet("Biscuit", "dog", available_minutes=60)
+    pet.add_task("Stairs practice", 15, 2, time="10:00")
+
+    assert Scheduler().detect_restricted_tasks(pet, [], date(2026, 7, 7)) == []
+
+
+def test_restricted_tasks_flags_owner_and_suggested_tasks_alike():
+    """The check is about the activity, not who scheduled it."""
+    pet = Pet("Biscuit", "dog", available_minutes=60)
+    pet.add_task("Stairs practice", 15, 2, time="10:00")
+    pet.accept_suggestion(SimpleNamespace(
+        name="Jumping practice", duration_minutes=10, priority=2,
+        time="11:00", frequency="daily", source_chunk_id="dog-general-enrichment",
+    ))
+
+    warnings = Scheduler().detect_restricted_tasks(
+        pet, ["stairs", "jumping"], date(2026, 7, 7))
+
+    assert len(warnings) == 2

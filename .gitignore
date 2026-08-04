@@ -3,3 +3,7 @@ __pycache__/
 .venv_new/
 .pytest_cache/
 .DS_Store
+
+# Never commit API keys. .env.example is the checked-in template.
+.env
+logs/
