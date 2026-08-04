@@ -87,6 +87,11 @@ def restricted_activities(pet):
     except KnowledgeBaseError:
         return []
 
+
+def due_minutes(pet) -> int:
+    """Total minutes for tasks that are due today and not completed yet."""
+    return sum(task.duration_minutes for task in pet.tasks if task.needs_doing(today))
+
 # Show and clear any one-off message stashed before a st.rerun() (see "Done").
 if "flash" in st.session_state:
     st.success(st.session_state.pop("flash"))
@@ -250,13 +255,21 @@ else:
                     # The one place a suggestion becomes a real task. From here it
                     # competes for the time budget like anything else the owner added.
                     pet.accept_suggestion(suggestion)
+                    total_due = due_minutes(pet)
+                    over_by = max(0, total_due - pet.available_minutes)
+                    remaining = max(0, pet.available_minutes - total_due)
                     result.suggestions.pop(index)
                     if not result.suggestions:
                         pending.pop(pet_name, None)
-                    st.session_state["flash"] = (
-                        f"Added '{suggestion.name}' to {pet_name}. "
-                        "Regenerate the schedule to see the new plan."
+                    flash = (
+                        f"Added '{suggestion.name}' (+{suggestion.duration_minutes} min) to {pet_name}. "
                     )
+                    if over_by:
+                        flash += f"{pet_name} is now {over_by} min over budget. "
+                    else:
+                        flash += f"{pet_name} has {remaining} min remaining. "
+                    flash += "Regenerate the schedule to see the new plan."
+                    st.session_state["flash"] = flash
                     st.rerun()
                 st.caption(
                     f"↳ {suggestion.rationale} · source: `{suggestion.source_chunk_id}`"

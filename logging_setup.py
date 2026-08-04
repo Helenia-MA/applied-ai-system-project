@@ -55,7 +55,16 @@ CONSOLE_FORMAT = "%(levelname)-8s %(name)s: %(message)s"
 # own and leave anything pytest or Streamlit attached alone.
 _HANDLER_TAG = "pawpal"
 
+# Project loggers that actually emit audit-worthy lines. The file handler is
+# attached here so the console can stay quieter without starving the log file.
+_FILE_LOGGER_NAMES = ("advisor", "retrieval", "logging_setup", "pawpal_system")
+
 _configured = False
+
+
+def _owned_loggers() -> list[logging.Logger]:
+    """All loggers this module configures, including the root logger."""
+    return [logging.getLogger()] + [logging.getLogger(name) for name in _FILE_LOGGER_NAMES]
 
 
 def resolve_level(level: str | int | None = None) -> int:
@@ -108,10 +117,9 @@ def setup_logging(
     file_level = min(console_level, FILE_LEVEL_FLOOR)
 
     root = logging.getLogger()
-    # The root logger should follow the caller's chosen console verbosity so
-    # environment-driven settings are honored consistently.
     root.setLevel(console_level)
-    _remove_our_handlers(root)
+    for logger in _owned_loggers():
+        _remove_our_handlers(logger)
 
     console = logging.StreamHandler()
     console.setLevel(console_level)
@@ -129,7 +137,10 @@ def setup_logging(
         file_handler.setLevel(file_level)
         file_handler.setFormatter(logging.Formatter(FILE_FORMAT))
         file_handler._pawpal = _HANDLER_TAG
-        root.addHandler(file_handler)
+        for logger_name in _FILE_LOGGER_NAMES:
+            logger = logging.getLogger(logger_name)
+            logger.setLevel(file_level)
+            logger.addHandler(file_handler)
         written_to = path
     except OSError as error:
         # A read-only checkout or a permissions problem shouldn't stop the app.
@@ -152,15 +163,17 @@ def setup_logging(
 
 def _current_log_path() -> Path | None:
     """The file our rotating handler is writing to, if one is attached."""
-    for handler in logging.getLogger().handlers:
-        if (getattr(handler, "_pawpal", None) == _HANDLER_TAG
-                and isinstance(handler, logging.handlers.RotatingFileHandler)):
-            return Path(handler.baseFilename)
+    for logger in _owned_loggers():
+        for handler in logger.handlers:
+            if (getattr(handler, "_pawpal", None) == _HANDLER_TAG
+                    and isinstance(handler, logging.handlers.RotatingFileHandler)):
+                return Path(handler.baseFilename)
     return None
 
 
 def reset_logging() -> None:
     """Detach our handlers and allow a fresh setup. For tests."""
     global _configured
-    _remove_our_handlers(logging.getLogger())
+    for logger in _owned_loggers():
+        _remove_our_handlers(logger)
     _configured = False

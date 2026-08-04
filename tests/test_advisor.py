@@ -9,6 +9,8 @@ reproducibly for someone else, and the guardrails are only worth having if their
 failure paths are actually tested.
 """
 
+from datetime import date
+
 import pytest
 from pydantic import ValidationError
 
@@ -23,7 +25,7 @@ from advisor import (
     suggest_care_tasks,
     validate_batch,
 )
-from pawpal_system import PRIORITY_VALUES, Pet
+from pawpal_system import PRIORITY_VALUES, Pet, Scheduler
 from retrieval import Chunk
 
 
@@ -532,3 +534,29 @@ def test_validate_batch_is_usable_on_its_own():
 
     assert len(accepted) == 1
     assert len(rejected) == 1
+
+
+def test_an_accepted_advisor_suggestion_changes_the_plan():
+    """End to end: advisor output becomes a real task and changes scheduling.
+
+    This proves the full accept -> plan path, not just a hand-built suggestion.
+    """
+    today = date(2026, 7, 7)
+    pet = Pet("Biscuit", "dog", available_minutes=30)
+    pet.add_task("Brushing", 25, PRIORITY_VALUES["low"], time="19:00")
+
+    result, _ = call_with([suggested(
+        name="Medication",
+        duration_minutes=10,
+        priority="high",
+        time="07:30",
+        source_chunk_id="dog-hip-dysplasia",
+    )], pet=pet)
+
+    assert [t.name for t in Scheduler().build_plan(pet.tasks, 30, today)] == ["Brushing"]
+
+    accepted = pet.accept_suggestion(result.suggestions[0])
+    after = [t.name for t in Scheduler().build_plan(pet.tasks, 30, today)]
+
+    assert accepted.source_note == "dog-hip-dysplasia"
+    assert after == ["Medication"]

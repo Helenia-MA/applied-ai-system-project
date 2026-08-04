@@ -1,0 +1,45 @@
+flowchart LR
+    %% PawPal+ system architecture and data flow.
+
+    Human[Human user]
+    UI[Streamlit app.py]
+    Scheduler[Scheduler\n(pawpal_system.py)]
+    PetTask[Pet.accept_suggestion()\nand Task storage]
+    Advisor[advisor.py\nRAG + guardrails]
+    Retriever[retrieval.py\nknowledge/care_kb.md]
+    Tests[Pytest + smoke check]
+    Logs[logging_setup.py\nlogs/pawpal.log]
+
+    Human -->|enter owner, pets, tasks| UI
+    Human -->|review warnings and sources| UI
+
+    UI -->|manual tasks / schedule request| Scheduler
+    UI -->|suggest care tasks| Advisor
+    Advisor -->|retrieve matching guidance| Retriever
+    Retriever -->|relevant chunks| Advisor
+    Advisor -->|validated suggestions| UI
+    UI -->|accept suggestion| PetTask
+    PetTask -->|stored as ordinary Task| Scheduler
+    Scheduler -->|daily plan, conflicts, explanation| UI
+
+    Tests -->|exercise scheduling behavior| Scheduler
+    Tests -->|exercise prompt, retrieval, and validation| Advisor
+    Tests -->|confirm end-to-end accept -> plan changes| PetTask
+
+    UI -->|audit trail and guardrail events| Logs
+    Advisor -->|token usage / rejections| Logs
+    Retriever -->|retrieval decisions| Logs
+
+    classDef human fill:#fff7e6,stroke:#c58b00,stroke-width:1px;
+    classDef core fill:#e8f4ff,stroke:#2f6f9f,stroke-width:1px;
+    classDef ai fill:#eefbe7,stroke:#4f8a10,stroke-width:1px;
+    classDef infra fill:#f4f4f4,stroke:#666,stroke-width:1px;
+
+    class Human human;
+    class UI core;
+    class Scheduler core;
+    class PetTask core;
+    class Advisor ai;
+    class Retriever ai;
+    class Tests infra;
+    class Logs infra;

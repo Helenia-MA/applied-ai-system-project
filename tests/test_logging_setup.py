@@ -43,15 +43,26 @@ def isolate_logging():
 
 
 def our_handlers():
-    """The handlers logging_setup owns, ignoring pytest's own."""
-    return [h for h in logging.getLogger().handlers
-            if getattr(h, "_pawpal", None) == logging_setup._HANDLER_TAG]
+    """The handlers logging_setup owns, ignoring pytest's own.
+
+    File logging is attached to the project loggers, while the console handler
+    stays on root. De-duplicate by identity because the same rotating handler is
+    shared across multiple project loggers.
+    """
+    seen: dict[int, logging.Handler] = {}
+    loggers = [logging.getLogger()]
+    loggers.extend(logging.getLogger(name) for name in logging_setup._FILE_LOGGER_NAMES)
+    for logger in loggers:
+        for handler in logger.handlers:
+            if getattr(handler, "_pawpal", None) == logging_setup._HANDLER_TAG:
+                seen[id(handler)] = handler
+    return list(seen.values())
 
 
 # --- Feature: handlers are attached ---------------------------------------
 
 def test_setup_attaches_a_console_and_a_file_handler(tmp_path):
-    """Console for the person running it, file for the audit trail."""
+    """Console for the person running it, shared file handler for the audit trail."""
     path = setup_logging("INFO", tmp_path / "pawpal.log", force=True)
 
     handlers = our_handlers()
