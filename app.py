@@ -1,7 +1,17 @@
 from datetime import date, time
 
 import streamlit as st
-from pawpal_system import Task, Pet, Owner, Scheduler, PRIORITY_VALUES, PRIORITY_LABELS
+from advisor import llm_enabled, suggest_care_tasks, unavailable_reason
+from pawpal_system import (
+    SOURCE_OWNER,
+    Task,
+    Pet,
+    Owner,
+    Scheduler,
+    PRIORITY_VALUES,
+    PRIORITY_LABELS,
+)
+from retrieval import KnowledgeBaseError, avoid_keywords, retrieve
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
 st.title("🐾 PawPal+")
@@ -57,6 +67,18 @@ if st.button("Start over"):
 # One scheduler and one notion of "today" for the whole render.
 scheduler = Scheduler()
 today = date.today()
+
+
+def restricted_activities(pet):
+    """Activities this pet's care guidance says to avoid, or [] if unavailable.
+
+    Wrapped so a missing or broken knowledge base costs the warnings only — the
+    schedule itself is built without any of this and must keep working.
+    """
+    try:
+        return avoid_keywords(retrieve(pet))
+    except KnowledgeBaseError:
+        return []
 
 # Show and clear any one-off message stashed before a st.rerun() (see "Done").
 if "flash" in st.session_state:
@@ -151,6 +173,103 @@ else:
                 time=task_time.strftime("%H:%M"),
             )
             st.success(f"Added '{task_title.strip()}' to {pet.name}.")
+
+st.divider()
+
+# --- Suggest care tasks (retrieval-augmented) ----------------------------
+# A fourth way to create tasks, alongside the manual form above. The pet's
+# profile fields are looked up against knowledge/care_kb.md, and only the
+# guidance that matches is sent to the model — so suggestions are grounded in
+# this pet's actual species, breed, age, and condition rather than invented.
+st.subheader("Suggest care tasks")
+st.caption(
+    "Looks up care guidance matching this pet's species, breed, age, and medical "
+    "condition, then proposes tasks based only on what it found. Nothing is added "
+    "to the schedule until you accept it."
+)
+
+if not owner.pets:
+    st.info("Add a pet first — suggestions are built from its profile.")
+elif not llm_enabled():
+    # Degraded mode. Everything else on the page keeps working, so say so
+    # plainly rather than hiding the section or showing an error.
+    st.info(f"{unavailable_reason()}  \nThe rest of PawPal+ works as normal.")
+else:
+    suggest_names = [pet.name for pet in owner.pets]
+    scol1, scol2 = st.columns([3, 1])
+    with scol1:
+        suggest_for = st.selectbox("Which pet?", suggest_names, key="suggest_pet")
+    with scol2:
+        # Blank label pushes the button down so it lines up with the selectbox.
+        st.write("")
+        run_suggest = st.button("Suggest tasks", key="suggest_go")
+
+    if run_suggest:
+        pet = owner.pets[suggest_names.index(suggest_for)]
+        # The call takes a few seconds, so show progress rather than freezing.
+        with st.spinner(f"Looking up care guidance for {pet.name}…"):
+            result = suggest_care_tasks(pet)
+        # Held in session state so accepting one suggestion doesn't discard the
+        # rest on the rerun, and doesn't cost another API call.
+        st.session_state.setdefault("suggestions", {})[pet.name] = result
+        st.rerun()
+
+    pending = st.session_state.get("suggestions", {})
+    for pet_name, result in list(pending.items()):
+        pet = next((p for p in owner.pets if p.name == pet_name), None)
+        if pet is None:
+            # The pet was removed (e.g. "Start over"); drop its stale suggestions.
+            pending.pop(pet_name, None)
+            continue
+
+        st.markdown(f"**Suggestions for {pet_name}**")
+        if result.chunk_ids:
+            # Shown so the owner can see which guidance the model was given —
+            # every suggestion below has to cite one of these.
+            st.caption("Grounded in: " + ", ".join(f"`{c}`" for c in result.chunk_ids))
+
+        if not result.available:
+            st.warning(result.reason)
+        elif not result.suggestions:
+            st.info(result.reason or "Nothing to suggest for this pet right now.")
+        else:
+            for index, suggestion in enumerate(list(result.suggestions)):
+                c1, c2, c3, c4, c5 = st.columns([1.5, 3.5, 2, 2, 1.5])
+                c1.write(suggestion.time)
+                c2.write(f"{suggestion.name} ({suggestion.frequency})")
+                c3.write(f"{suggestion.duration_minutes} min")
+                c4.write(PRIORITY_LABELS[suggestion.priority])
+                if c5.button("Accept", key=f"accept_{pet_name}_{index}_{suggestion.name}"):
+                    # The one place a suggestion becomes a real task. From here it
+                    # competes for the time budget like anything else the owner added.
+                    pet.accept_suggestion(suggestion)
+                    result.suggestions.pop(index)
+                    if not result.suggestions:
+                        pending.pop(pet_name, None)
+                    st.session_state["flash"] = (
+                        f"Added '{suggestion.name}' to {pet_name}. "
+                        "Regenerate the schedule to see the new plan."
+                    )
+                    st.rerun()
+                st.caption(
+                    f"↳ {suggestion.rationale} · source: `{suggestion.source_chunk_id}`"
+                )
+
+        if result.rejected:
+            # Surfaced rather than hidden: the guardrails rejecting a suggestion
+            # is the system working, and it's worth being able to see why.
+            with st.expander(f"{len(result.rejected)} filtered out by guardrails"):
+                for reason in result.rejected:
+                    st.text(reason)
+
+        if st.button("Dismiss these", key=f"dismiss_{pet_name}"):
+            pending.pop(pet_name, None)
+            st.rerun()
+
+    st.caption(
+        "⚠️ Suggestions come from a small illustrative care knowledge base and are "
+        "not veterinary advice. Check anything medical with your vet."
+    )
 
 st.divider()
 
@@ -323,6 +442,15 @@ if st.button("Generate schedule"):
             for warning in conflicts:
                 st.warning(warning)
 
+            # Retrieved care guidance also judges the tasks already on the list:
+            # anything involving an activity this pet should avoid gets flagged.
+            # Warning only — the owner decides whether to move or drop it, so a
+            # flagged task can still appear in the plan below.
+            for warning in scheduler.detect_restricted_tasks(
+                pet, restricted_activities(pet), today
+            ):
+                st.warning(f"🚫 {warning}")
+
             if plan:
                 # A clean table reads far better than a bulleted list for the
                 # order the owner will actually work through the day.
@@ -333,6 +461,11 @@ if st.button("Generate schedule"):
                             "Task": t.name,
                             "Minutes": t.duration_minutes,
                             "Priority": PRIORITY_LABELS[t.priority],
+                            # Provenance travels into the plan, so the owner can
+                            # tell at a glance which entries they wrote and which
+                            # came from accepted care guidance.
+                            "From": "you" if t.source == SOURCE_OWNER
+                                    else f"suggested ({t.source_note})",
                         }
                         for t in plan
                     ]
