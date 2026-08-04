@@ -170,7 +170,7 @@ What I learned:
 - I tried to ensure that the owner stayed in control of accepting suggestions so that the final list wasn't overtaken solely by the suggested tasks
 - Having clear logs and explicit guardrails makes AI behavior much easier to understand and trust
 
-## Testing
+### pytest
 ```
 ================================== test session starts ==================================
 platform darwin -- Python 3.13.10, pytest-9.0.3, pluggy-1.6.0
