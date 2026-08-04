@@ -1,5 +1,19 @@
 # PawPal+ Project Reflection
 
+## Limitations and biases
+- suggestions are solely based on the information in the knowledge folder, thus may not fully cater for rare breeds, species or conditions
+- since we're using greedy scheduling, the planner prioritizes high-priority and shorter tasks, which can then leady to longer important tasks being at a disadvantage
+- since the plan focuses on each pet separately, optimization for an individual pet may be suboptimal for the owner overally across all pets
+
+## AI misuse prevention
+the suggestions could be treated as veterinary diagnosis; we resolve this by clearly indicating and labelling the outputs as planning support and not medical advice, and adding a message recommending vet confirmation for health decisions
+
+## AI reliability
+I realized the retrieval quality mattered a lot more than the model in the suggested task list generation. Constraining the suggestions to the retrieved chunks helped narrowing down and making the end product more dependable
+
+## AI collaboration
+It helped me a lot in planning out and implementing the RAG feature. I loved how it formatted the care_kb.md for easier and more efficient retrieval of the needed information chunks for the different pet species and conditions.
+
 ## 1. System Design
 
 **a. Initial design**

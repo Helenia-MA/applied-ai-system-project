@@ -171,6 +171,7 @@ What I learned:
 - Having clear logs and explicit guardrails makes AI behavior much easier to understand and trust
 
 ## Testing
+```
 ================================== test session starts ==================================
 platform darwin -- Python 3.13.10, pytest-9.0.3, pluggy-1.6.0
 rootdir: /Users/Admin/applied-ai-system-project
@@ -183,7 +184,7 @@ tests/test_pawpal.py .......................................                    
 tests/test_retrieval.py ......................                                    [100%]
 
 ================================== 125 passed in 1.32s ==================================
-
+```
 ## Notes
 
 - Architecture source: [`diagrams/architecture.mmd`](diagrams/architecture.mmd)
