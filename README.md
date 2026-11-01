@@ -115,7 +115,7 @@ The scheduler flags the task instead of silently accepting it.
 ```text
 Activities to avoid for this pet: agility, jumping, running, stairs
 
-⚠ 'Stairs practice' involves stairs, which Biscuit's care profile says to avoid.
+⚠ 'Stairs practice' involves stairs, which Kovu's care profile says to avoid.
 ```
 
 ### 3) Accepting a suggestion changes the schedule
@@ -131,7 +131,7 @@ Activities to avoid for this pet: agility, jumping, running, stairs
 After the suggestion is accepted, the schedule changes and the UI reports the budget impact.
 
 ```text
-Added 'Medication' (+10 min) to Biscuit. Biscuit has 20 min remaining. Regenerate the schedule to see the new plan.
+Added 'Medication' (+10 min) to Kovu. Kovu has 20 min remaining. Regenerate the schedule to see the new plan.
 
 Plan after accepting:
   07:30  Medication        10 min [high]
