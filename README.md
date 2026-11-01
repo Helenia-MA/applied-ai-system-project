@@ -149,6 +149,14 @@ The AI layer is retrieval-augmented, thus the system is narrower than a general 
 Suggested tasks are not written directly into the schedule. They become ordinary tasks only after the owner accepts them. That keeps the human in control and makes the UI safer to use.
 
 Logging and guardrails are built in so the app can explain what it did, what it retrieved, and why a suggestion was rejected.
+For example, when the AI suggested a task the owner already had, the advisor
+rejected it before it reached the scheduler and recorded the reason:
+
+```text
+2026-11-01 00:42:05,666 WARNING  advisor: Suggestion rejected: 'Swim session' duplicates an existing task
+```
+
+This behavior is covered by [`test_suggestion_duplicating_an_existing_task_is_rejected`](tests/test_advisor.py#L297-L305).
 
 ## Testing Summary
 
