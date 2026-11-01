@@ -38,7 +38,7 @@ my design entails 3 classes: task, owner and scheduler;
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
    * Added frequency and completed attributes to the Task class so we can handle repeating tasks and can also allow user to keep track of the completed/uncompleted tasks and have a chance to add some of the dropped off tasks back to the list if some of the completed ones took shorter time than allocated.
-* added an all_tasks function to allow the owner to see all their added tasks
+   * added an all_tasks function to allow the owner to see all their added tasks
 
 
 ---
@@ -49,7 +49,7 @@ my design entails 3 classes: task, owner and scheduler;
 
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
 - How did you decide which constraints mattered most?
-
+     * myscheduler considers time and priority. I prioritized priority in order to ensure that tasks that had been tagged as urgent were included despite the amount of time they would take. I then sorted the tasks by time, starting from the ones with the shortest to the longest durations, to allow for more task coverage rather than few long ones. 
 
 **b. Tradeoffs**
 
@@ -57,7 +57,7 @@ my design entails 3 classes: task, owner and scheduler;
 - Why is that tradeoff reasonable for this scenario?
    * The scheduler produces the ordered to-do list that fits the daily time budget and not necessarily a true calendar. It only uses the task's provided time to order the list rather than as a basis for fitting tasks to the schedule. Thus our conflict constraint only catches exact time matches and not tasks with overlapping times.
 
-This is a reasonable tradeoff in this scenario since the main focus of the scheduler is in helping the owner prioritize and decide what to do first and not necessarily when. As long as the tasks are catered to fit in the available given time scope, the exact time a specific task is done is more flexible and not as rigid.
+   * This is a reasonable tradeoff in this scenario since the main focus of the scheduler is in helping the owner prioritize and decide what to do first and not necessarily when. As long as the tasks are catered to fit in the available given time scope, the exact time a specific task is done is more flexible and not as rigid.
 ---
 
 ## 3. AI Collaboration
@@ -74,8 +74,8 @@ This is a reasonable tradeoff in this scenario since the main focus of the sched
 
 - Describe one moment where you did not accept an AI suggestion as-is.
 - How did you evaluate or verify what the AI suggested?
-   In the beginning, it offered to have tasks as an attribute of owner without its own class and have us return one list of tasks for the owner for all its pets.
-   I decided to add the class and have a function mapping each list to its respective pet for an owner with multiple pets since it felt more intuitive and worked well in distinguishing each pet's tasks especially in cases where there are similar tasks for each one.
+   * In the beginning, it offered to have tasks as an attribute of owner without its own class and have us return one list of tasks for the owner for all its pets.
+   * I decided to add the class and have a function mapping each list to its respective pet for an owner with multiple pets since it felt more intuitive and worked well in distinguishing each pet's tasks especially in cases where there are similar tasks for each one.
 
 ---
 
@@ -86,8 +86,8 @@ This is a reasonable tradeoff in this scenario since the main focus of the sched
 - What behaviors did you test?
 - Why were these tests important?
    I tested for sorting, the recurrence logic and conflict detection
-   sorting correctness was important in ensuring that the priorities of the tasks were considered and we attempted fitting as many tasks as possible within the time budget by prioritizing the shortest ones first. I also tested that when there is free time left that could fit medium priority tasks while a remaining high task was too long, the scheduler wouldn't stop but continue adding the medium priority tasks to the list
-   the recurrence logic tests were important in ensuring the new occurrences were not marked as complete, they appeared on the day they were due and stopped after the frequency was over
+    * sorting correctness was important in ensuring that the priorities of the tasks were considered and we attempted fitting as many tasks as possible within the time budget by prioritizing the shortest ones first. I also tested that when there is free time left that could fit medium priority tasks while a remaining high task was too long, the scheduler wouldn't stop but continue adding the medium priority tasks to the list
+   * the recurrence logic tests were important in ensuring the new occurrences were not marked as complete, they appeared on the day they were due and stopped after the frequency was over
 conflic detection tests were for the warning message when two tasks across all the owner's pets had the same time.
 
 **b. Confidence**
@@ -95,8 +95,8 @@ conflic detection tests were for the warning message when two tasks across all t
 - How confident are you that your scheduler works correctly?
 90%
 - What edge cases would you test next if you had more time?
-the tasks with overlapping times
-tasks with long durations but critical
+   * the tasks with overlapping times
+   * tasks with long durations but critical
 
 ---
 
