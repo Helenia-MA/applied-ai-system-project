@@ -81,13 +81,14 @@ The diagram source is in [`diagrams/architecture.mmd`](diagrams/architecture.mmd
 ### 1) Retrieval-backed suggestion
 
 **Input:**
-
+```text
 - Pet: Kovu
 - Species: Dog
 - Breed: Labrador Retriever
 - Medical condition: hip dysplasia
+```
 
-**Result:**
+**Output/Result:**
 
 The advisor retrieves guidance such as `dog-hip-dysplasia` and can suggest low-impact activities like a swim session.
 
@@ -103,12 +104,13 @@ Retrieved 2 guidance chunk(s):
 ### 2) Guardrail warning for restricted activity
 
 **Input:**
-
+```text
 - Pet: Kovu
 - Profile guidance says to avoid stairs
 - Existing task: Stairs practice
+```
 
-**Result:**
+**Output/Result:**
 
 The scheduler flags the task instead of silently accepting it.
 
@@ -121,12 +123,13 @@ Activities to avoid for this pet: agility, jumping, running, stairs
 ### 3) Accepting a suggestion changes the schedule
 
 **Input:**
-
+```text
 - Current tasks: Brushing (25 min, low priority)
 - Suggested task: Medication (10 min, high priority)
 - Available time: 30 min
+```
 
-**Result:**
+**Output/Result:**
 
 After the suggestion is accepted, the schedule changes and the UI reports the budget impact.
 
