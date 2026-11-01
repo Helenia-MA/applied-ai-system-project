@@ -110,7 +110,7 @@ conflic detection tests were for the warning message when two tasks across all t
 **b. What you would improve**
 
 - If you had another iteration, what would you improve or redesign?
-   * I would improve the priority, right the aim is to just fit as many tasks as possible, with time I could brainstorm a logic that put more things into consideration
+   * I would improve the priority, right while it considers urgency, the algorithm prioritizes ones with shorter durations thus in some instances, some urgent tasks that take long are discarded in favor of moderately urgent shorter ones when the remaining available time is less. With time, I could brainstorm a logic that puts more things into consideration
 
 **c. Key takeaway**
 
