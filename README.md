@@ -189,7 +189,7 @@ tests/test_retrieval.py ......................                                  
 ================================== 125 passed in 1.32s ==================================
 ```
 ## Notes
-
+- Reflection: [`model_card.md`](model_card.md)
 - Architecture source: [`diagrams/architecture.mmd`](diagrams/architecture.mmd)
 - UML source: [`diagrams/uml.mmd`](diagrams/uml.mmd)
 - Main app: [`app.py`](app.py)
