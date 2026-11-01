@@ -105,14 +105,14 @@ tasks with long durations but critical
 **a. What went well**
 
 - What part of this project are you most satisfied with?
-i was satisfied with how well the frequency logic came together
+   * I was satisfied with how well the frequency logic came together
 
 **b. What you would improve**
 
 - If you had another iteration, what would you improve or redesign?
-I would improve the priority, right the aim is to just fit as many tasks as possible, with time I could brainstorm a logic that put more things into consideration
+   * I would improve the priority, right the aim is to just fit as many tasks as possible, with time I could brainstorm a logic that put more things into consideration
 
 **c. Key takeaway**
 
 - What is one important thing you learned about designing systems or working with AI on this project?
-That the best way to get good results is to work on small chunks of the app and give it the context it needs.
+   * That the best way to get good results is to work on small chunks of the app and give it the context it needs.
