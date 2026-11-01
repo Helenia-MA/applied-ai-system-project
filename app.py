@@ -100,7 +100,7 @@ st.divider()
 # Grouped in a form so the fields commit together on submit (no per-widget
 # "Press Enter to apply" state), and clear themselves after a pet is added.
 st.subheader("Add a pet")
-with st.form("add_pet", clear_on_submit=True):
+with st.form("add_pet", clear_on_submit=True, enter_to_submit=False):
     col1, col2, col3 = st.columns(3)
     with col1:
         new_pet_name = st.text_input("Pet name", value="", placeholder="e.g. Mochi")
