@@ -151,6 +151,7 @@ Suggested tasks are not written directly into the schedule. They become ordinary
 Logging and guardrails are built in so the app can explain what it did, what it retrieved, and why a suggestion was rejected.
 For example, when the AI suggested a task the owner already had, the advisor
 rejected it before it reached the scheduler and recorded the reason:
+
 **Input:**
 ```text
 Pet: Kovu
