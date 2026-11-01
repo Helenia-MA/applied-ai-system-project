@@ -152,7 +152,7 @@ Logging and guardrails are built in so the app can explain what it did, what it 
 
 ## Testing Summary
 
-What worked:
+#### What worked:
 
 - task sorting by time and duration
 - greedy plan building and time-budget handling
@@ -162,12 +162,12 @@ What worked:
 - logging configuration and file output
 - the end-to-end accept -> plan integration test
 
-What did not work automatically:
+#### What did not work automatically:
 
 - live AI suggestions need a valid Gemini API key
 - the app falls back to a safe degraded mode when the key or knowledge base is unavailable
 
-What I learned:
+#### What I learned:
 
 - keeping the retrieval, validation, and scheduling separate made the system easier to test
 - I tried to ensure that the owner stayed in control of accepting suggestions so that the final list wasn't overtaken solely by the suggested tasks
