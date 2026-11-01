@@ -1,5 +1,7 @@
 # PawPal+ Final Project
 
+Live demo: https://pawspal.streamlit.app/ 
+
 PawPal+ is a pet-care planning assistant built with Streamlit. It helps a pet owner organize care tasks, generate a daily schedule, and use retrieval-augmented AI to suggest new tasks based on a small care knowledge base.
 
 ## Original Project
