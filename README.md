@@ -163,7 +163,7 @@ Model suggestion: "Swim session" (15 min)
 2026-11-01 00:42:05,666 WARNING  advisor: Suggestion rejected: 'Swim session' duplicates an existing task
 ```
 
-This behavior is covered by [`test_suggestion_duplicating_an_existing_task_is_rejected`](tests/test_advisor.py#L297-L305).
+This behavior is covered by 'test_suggestion_duplicating_an_existing_task_is_rejected' in [`tests/test_advisor.py`](tests/test_advisor.py).
 
 ## Testing Summary
 
